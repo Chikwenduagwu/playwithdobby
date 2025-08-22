@@ -6,15 +6,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>You vs Dobby — Chess with Sarcasm</title>
 
-<!-- Chess rules engine -->
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.13.4/chess.min.js" crossorigin="anonymous"></script>
-  <script src="js/chess.min.js"></script>
-<!-- Fallback local chess.js (uncomment if CDN fails and place chess.min.js in /public) -->
-<!-- <script defer src="/chess.min.js"></script> -->
+<!-- Chess rules engine (use local copy) -->
+<script defer src="/chess.min.js"></script>
+<!-- Commented out CDN (not working) -->
+<!-- <script defer src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.13.4/chess.min.js" crossorigin="anonymous"></script> -->
 
 <style>
   :root {
-    --board-size: 640px; /* Fixed size for debugging */
+    --board-size: 640px;
     --sq: calc(var(--board-size) / 8);
     --green-dark: #2f5d3a;
     --green-light: #a7d7a9;
@@ -97,7 +96,7 @@
     display: grid;
     grid-template-columns: repeat(8, 1fr);
     grid-template-rows: repeat(8, 1fr);
-    background: #fff; /* Fallback to ensure grid visibility */
+    background: #fff;
   }
   .sq {
     position: relative;
@@ -136,28 +135,6 @@
   .piece:active { cursor: grabbing; }
   .white { color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,.4); }
   .black { color: #111; text-shadow: 0 1px 0 #fff; }
-
-  /* Optional: Image-based pieces (uncomment and add images to /public/images) */
-  /*
-  .piece {
-    background-size: contain;
-    background-repeat: no-repeat;
-    background-position: center;
-    text-indent: -9999px;
-  }
-  .white.P { background-image: url('/images/wp.png'); }
-  .white.N { background-image: url('/images/wn.png'); }
-  .white.B { background-image: url('/images/wb.png'); }
-  .white.R { background-image: url('/images/wr.png'); }
-  .white.Q { background-image: url('/images/wq.png'); }
-  .white.K { background-image: url('/images/wk.png'); }
-  .black.p { background-image: url('/images/bp.png'); }
-  .black.n { background-image: url('/images/bn.png'); }
-  .black.b { background-image: url('/images/bb.png'); }
-  .black.r { background-image: url('/images/br.png'); }
-  .black.q { background-image: url('/images/bq.png'); }
-  .black.k { background-image: url('/images/bk.png'); }
-  */
 
   .hint {
     position: absolute;
@@ -300,8 +277,7 @@ In 1–2 sharp sentences, deliver a witty roast. Avoid slurs or hateful content;
   let game;
   if (typeof Chess === 'undefined') {
     console.error("Chess.js failed to load");
-    logDobby("Chess.js didn't load. No board for you! Try refreshing or checking your network.");
-    // Fallback: Minimal board setup for debugging
+    logDobby("Chess.js didn't load. No board for you! Check if chess.min.js is in /public.");
     document.getElementById("status").textContent = "Error: Chess.js failed to load.";
   } else {
     game = new Chess();
@@ -724,7 +700,7 @@ In 1–2 sharp sentences, deliver a witty roast. Avoid slurs or hateful content;
   window.addEventListener('load', () => {
     if (typeof Chess === 'undefined') {
       console.error("Chess.js not loaded after page load");
-      logDobby("Chess.js still not loaded. Check your network or use a local copy.");
+      logDobby("Chess.js still not loaded. Check if chess.min.js is in /public.");
     } else {
       renderAll();
     }
@@ -732,4 +708,3 @@ In 1–2 sharp sentences, deliver a witty roast. Avoid slurs or hateful content;
 </script>
 </body>
 </html>
-
