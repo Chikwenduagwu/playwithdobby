@@ -4,14 +4,16 @@
 <meta charset="utf-8" />
 <meta http-equiv="x-ua-compatible" content="IE=edge" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>You vs Dobby — Chess + Sarcasm</title>
+<title>You vs Dobby — Chess with Sarcasm</title>
 
 <!-- Chess rules engine -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.13.4/chess.min.js" crossorigin="anonymous"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.13.4/chess.min.js" crossorigin="anonymous"></script>
+<!-- Fallback local chess.js (uncomment if CDN fails and place chess.min.js in /public) -->
+<!-- <script defer src="/chess.min.js"></script> -->
 
 <style>
   :root {
-    --board-size: min(78vmin, 640px);
+    --board-size: 640px; /* Fixed size for debugging */
     --sq: calc(var(--board-size) / 8);
     --green-dark: #2f5d3a;
     --green-light: #a7d7a9;
@@ -23,7 +25,7 @@
     margin: 0;
     background: radial-gradient(1200px 600px at 22% 12%, #101214 0%, #0a0b0d 60%, #000 100%);
     color: #e9eef3;
-    font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", "Noto Chess", sans-serif;
     display: flex;
     min-height: 100vh;
     align-items: center;
@@ -85,7 +87,6 @@
     height: var(--board-size);
     position: relative;
     border-radius: var(--bevel);
-    overflow: hidden;
     background: #0003;
     box-shadow: 0 5px 15px rgba(0,0,0,.5);
   }
@@ -95,6 +96,7 @@
     display: grid;
     grid-template-columns: repeat(8, 1fr);
     grid-template-rows: repeat(8, 1fr);
+    background: #fff; /* Fallback to ensure grid visibility */
   }
   .sq {
     position: relative;
@@ -102,15 +104,15 @@
     height: 100%;
     box-shadow: inset 0 0 0 1px rgba(0,0,0,.2);
   }
-  .sq.dark { background: linear-gradient(180deg, #315a3a 0%, var(--green-dark) 100%); }
-  .sq.light { background: linear-gradient(180deg, #cfe9cf 0%, var(--green-light) 100%); }
+  .sq.dark { background: var(--green-dark); }
+  .sq.light { background: var(--green-light); }
 
   .rank-label, .file-label {
     position: absolute;
     font-size: 10px;
     font-weight: 700;
-    color: rgba(0,0,0,.35);
-    text-shadow: 0 1px 0 rgba(255,255,255,.35);
+    color: rgba(0,0,0,.8);
+    text-shadow: 0 1px 0 rgba(255,255,255,.5);
     pointer-events: none;
   }
   .rank-label { top: 4px; left: 6px; }
@@ -123,14 +125,38 @@
     display: grid;
     place-items: center;
     font-size: calc(var(--sq) * 0.68);
+    font-family: "Noto Chess", "Segoe UI Symbol", sans-serif;
     user-select: none;
     cursor: grab;
+    z-index: 10;
     filter: drop-shadow(0 4px 4px rgba(0,0,0,.55));
     transition: transform .05s ease;
   }
   .piece:active { cursor: grabbing; }
-  .white { color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,.4), 0 0 18px rgba(255,255,255,.35); }
-  .black { color: #111; text-shadow: 0 1px 0 #fff, 0 0 12px rgba(0,0,0,.15); }
+  .white { color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,.4); }
+  .black { color: #111; text-shadow: 0 1px 0 #fff; }
+
+  /* Optional: Image-based pieces (uncomment and add images to /public/images) */
+  /*
+  .piece {
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    text-indent: -9999px;
+  }
+  .white.P { background-image: url('/images/wp.png'); }
+  .white.N { background-image: url('/images/wn.png'); }
+  .white.B { background-image: url('/images/wb.png'); }
+  .white.R { background-image: url('/images/wr.png'); }
+  .white.Q { background-image: url('/images/wq.png'); }
+  .white.K { background-image: url('/images/wk.png'); }
+  .black.p { background-image: url('/images/bp.png'); }
+  .black.n { background-image: url('/images/bn.png'); }
+  .black.b { background-image: url('/images/bb.png'); }
+  .black.r { background-image: url('/images/br.png'); }
+  .black.q { background-image: url('/images/bq.png'); }
+  .black.k { background-image: url('/images/bk.png'); }
+  */
 
   .hint {
     position: absolute;
@@ -148,7 +174,7 @@
     inset: 16% 16%;
     border-radius: 50%;
     border: 3px solid rgba(200, 30, 30, .85);
-    box-shadow: 0 0 10px rgba(200,30,30,.55), inset 0 0 8px rgba(200,30,30,.45);
+    box-shadow: 0 0 10px rgba(200,30,30,.55);
   }
   .selected { outline: 3px solid rgba(255,255,0,.8); outline-offset: -3px; }
 
@@ -162,7 +188,7 @@
     border: 1px solid #223145;
     border-radius: 14px;
     padding: 12px;
-    box-shadow: 0 10px 25px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.03);
+    box-shadow: 0 10px 25px rgba(0,0,0,.35);
   }
   .panel h3 { margin: 0 0 10px 0; font-size: 15px; letter-spacing: .4px; color: #bcd2f1; }
   .log {
@@ -237,7 +263,6 @@
     const prompt = `You are Dobby, a sarcastic, foul-mouthed (but not hateful) chess commentator.
 ${aboutWho} just played: ${moveSAN}.
 In 1–2 sharp sentences, deliver a witty roast. Avoid slurs or hateful content; light profanity is okay.`;
-
     try {
       const res = await fetch("https://api.fireworks.ai/inference/v1/completions", {
         method: "POST",
@@ -271,7 +296,16 @@ In 1–2 sharp sentences, deliver a witty roast. Avoid slurs or hateful content;
   /**********************
    * Game state & setup *
    **********************/
-  const game = new Chess();
+  let game;
+  if (typeof Chess === 'undefined') {
+    console.error("Chess.js failed to load");
+    logDobby("Chess.js didn't load. No board for you! Try refreshing or checking your network.");
+    // Fallback: Minimal board setup for debugging
+    document.getElementById("status").textContent = "Error: Chess.js failed to load.";
+  } else {
+    game = new Chess();
+    console.log("Chess.js initialized successfully");
+  }
 
   const boardEl = document.getElementById('board');
   const gridEl = document.getElementById('grid');
@@ -291,6 +325,7 @@ In 1–2 sharp sentences, deliver a witty roast. Avoid slurs or hateful content;
   };
 
   function buildGrid() {
+    console.log("Building grid");
     gridEl.innerHTML = '';
     for (let r = 8; r >= 1; r--) {
       for (let f = 1; f <= 8; f++) {
@@ -319,6 +354,7 @@ In 1–2 sharp sentences, deliver a witty roast. Avoid slurs or hateful content;
         gridEl.appendChild(sq);
       }
     }
+    console.log("Grid built with 64 squares");
   }
 
   function sqToIdx(sq) {
@@ -335,8 +371,9 @@ In 1–2 sharp sentences, deliver a witty roast. Avoid slurs or hateful content;
     const { file, rank } = sqToIdx(sq);
     const f = flipped ? 7 - file : file;
     const r = flipped ? rank : 7 - rank;
-    const size = boardEl.getBoundingClientRect().width || 640; // Fallback size
+    const size = boardEl.getBoundingClientRect().width || 640;
     const cell = size / 8;
+    console.log(`Square ${sq}: x=${f * cell}, y=${r * cell}, cell=${cell}`);
     return { x: f * cell, y: r * cell, cell };
   }
 
@@ -346,6 +383,7 @@ In 1–2 sharp sentences, deliver a witty roast. Avoid slurs or hateful content;
   }
 
   function showHints(from) {
+    if (!game) return;
     clearHints();
     const moves = game.moves({ square: from, verbose: true });
     legalTargets = moves.map(m => m.to);
@@ -364,9 +402,18 @@ In 1–2 sharp sentences, deliver a witty roast. Avoid slurs or hateful content;
   }
 
   function renderPieces() {
+    if (!game) return;
+    console.log("Rendering pieces");
     document.querySelectorAll('.piece').forEach(p => p.remove());
 
     const board = game.board();
+    if (!board) {
+      console.error("game.board() returned null or undefined");
+      logDobby("No board data! Did chess.js load properly?");
+      return;
+    }
+
+    let pieceCount = 0;
     for (let r = 8; r >= 1; r--) {
       for (let f = 1; f <= 8; f++) {
         const sq = 'abcdefgh'[f - 1] + r;
@@ -383,20 +430,28 @@ In 1–2 sharp sentences, deliver a witty roast. Avoid slurs or hateful content;
         el.dataset.square = sq;
 
         el.addEventListener('mousedown', startDrag);
-
         boardEl.appendChild(el);
+        pieceCount++;
       }
     }
+    console.log(`Rendered ${pieceCount} pieces`);
   }
 
   function renderAll() {
+    if (!game) {
+      logDobby("Cannot render board: Chess.js not loaded.");
+      return;
+    }
+    console.log("Rendering all");
     buildGrid();
     renderPieces();
     updateStatus();
     refreshMoveList();
+    console.log("Render complete");
   }
 
   function onSquareClick(e) {
+    if (!game) return;
     const sq = e.currentTarget.dataset.square;
     const piece = game.get(sq);
 
@@ -429,6 +484,7 @@ In 1–2 sharp sentences, deliver a witty roast. Avoid slurs or hateful content;
   }
 
   function startDrag(e) {
+    if (!game) return;
     const sq = e.currentTarget.dataset.square;
     const piece = game.get(sq);
     if (!piece || piece.color !== game.turn()) return;
@@ -499,6 +555,7 @@ In 1–2 sharp sentences, deliver a witty roast. Avoid slurs or hateful content;
   }
 
   function updateStatus() {
+    if (!game) return;
     if (game.in_checkmate()) {
       statusEl.textContent = (game.turn() === 'w' ? 'Black' : 'White') + ' wins by checkmate.';
       return;
@@ -511,6 +568,7 @@ In 1–2 sharp sentences, deliver a witty roast. Avoid slurs or hateful content;
   }
 
   function refreshMoveList() {
+    if (!game) return;
     const history = game.history({ verbose: true });
     moveListEl.innerHTML = '';
     let line = [];
@@ -612,7 +670,7 @@ In 1–2 sharp sentences, deliver a witty roast. Avoid slurs or hateful content;
   }
 
   function systemMove() {
-    if (game.game_over()) return;
+    if (!game || game.game_over()) return;
     const depth = 3;
     const isMaximizing = (game.turn() === 'b');
     const move = minimaxRoot(depth, game, isMaximizing) || game.moves({ verbose: true })[0];
@@ -627,6 +685,7 @@ In 1–2 sharp sentences, deliver a witty roast. Avoid slurs or hateful content;
   }
 
   document.getElementById('newGame').addEventListener('click', () => {
+    if (!game) return;
     game.reset();
     selected = null;
     clearHints();
@@ -641,6 +700,7 @@ In 1–2 sharp sentences, deliver a witty roast. Avoid slurs or hateful content;
   });
 
   document.getElementById('hint').addEventListener('click', () => {
+    if (!game) return;
     const move = minimaxRoot(2, game, game.turn() === 'w');
     if (move) {
       logDobby(`Hint: I'd consider ${move.san}. (Not that you'll listen.)`);
@@ -650,6 +710,7 @@ In 1–2 sharp sentences, deliver a witty roast. Avoid slurs or hateful content;
   });
 
   document.getElementById('undo').addEventListener('click', () => {
+    if (!game) return;
     game.undo();
     game.undo();
     selected = null;
@@ -658,7 +719,15 @@ In 1–2 sharp sentences, deliver a witty roast. Avoid slurs or hateful content;
     logDobby("Undo? Bold. Let's pretend that blunder never happened.");
   });
 
-  renderAll();
+  // Wait for Chess.js to load
+  window.addEventListener('load', () => {
+    if (typeof Chess === 'undefined') {
+      console.error("Chess.js not loaded after page load");
+      logDobby("Chess.js still not loaded. Check your network or use a local copy.");
+    } else {
+      renderAll();
+    }
+  });
 </script>
 </body>
 </html>
