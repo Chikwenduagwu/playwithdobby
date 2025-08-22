@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="x-ua-compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>You vs Dobby — Chess + Sarcasm</title>
+
+<!-- Chess rules engine -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.13.4/chess.min.js" crossorigin="anonymous"></script>
+
+<style>
+  :root {
+    --board-size: min(78vmin, 640px);
+    --sq: calc(var(--board-size) / 8);
+    --green-dark: #2f5d3a;
+    --green-light: #a7d7a9;
+    --bevel: 8px;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: radial-gradient(1200px 600px at 22% 12%, #101214 0%, #0a0b0d 60%, #000 100%);
+    color: #e9eef3;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
+    display: flex;
+    min-height: 100vh;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .wrap {
+    width: 100%;
+    max-width: 1220px;
+    padding: 18px;
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 18px;
+  }
+
+  .title {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .title h1 { margin: 0; font-size: clamp(18px, 2.4vw, 28px); letter-spacing: .4px; }
+  .title small { opacity: .75; }
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  .controls button {
+    background: #1b2330;
+    color: #e4edf7;
+    border: 1px solid #2c3a4f;
+    padding: 8px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+  }
+  .controls button:hover { background: #223048; }
+
+  .board-stand {
+    width: calc(var(--board-size) + 40px);
+    height: calc(var(--board-size) + 40px);
+    margin: 0 auto;
+    background: linear-gradient(145deg, #4b2c1f, #2e1810);
+    border-radius: 20px;
+    box-shadow: 0 10px 20px rgba(0,0,0,.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .board-frame {
+    width: var(--board-size);
+    height: var(--board-size);
+  }
+  .board {
+    width: var(--board-size);
+    height: var(--board-size);
+    position: relative;
+    border-radius: var(--bevel);
+    overflow: hidden;
+    background: #0003;
+    box-shadow: 0 5px 15px rgba(0,0,0,.5);
+  }
+  .grid {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(8, 1fr);
+  }
+  .sq {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,.2);
+  }
+  .sq.dark { background: linear-gradient(180deg, #315a3a 0%, var(--green-dark) 100%); }
+  .sq.light { background: linear-gradient(180deg, #cfe9cf 0%, var(--green-light) 100%); }
+
+  .rank-label, .file-label {
+    position: absolute;
+    font-size: 10px;
+    font-weight: 700;
+    color: rgba(0,0,0,.35);
+    text-shadow: 0 1px 0 rgba(255,255,255,.35);
+    pointer-events: none;
+  }
+  .rank-label { top: 4px; left: 6px; }
+  .file-label { bottom: 4px; right: 6px; }
+
+  .piece {
+    position: absolute;
+    width: var(--sq);
+    height: var(--sq);
+    display: grid;
+    place-items: center;
+    font-size: calc(var(--sq) * 0.68);
+    user-select: none;
+    cursor: grab;
+    filter: drop-shadow(0 4px 4px rgba(0,0,0,.55));
+    transition: transform .05s ease;
+  }
+  .piece:active { cursor: grabbing; }
+  .white { color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,.4), 0 0 18px rgba(255,255,255,.35); }
+  .black { color: #111; text-shadow: 0 1px 0 #fff, 0 0 12px rgba(0,0,0,.15); }
+
+  .hint {
+    position: absolute;
+    inset: 25% 25% auto auto;
+    width: 50%;
+    height: 50%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, rgba(255,255,255,.85), rgba(255,255,255,.1) 55%, transparent 60%);
+    box-shadow: 0 4px 10px rgba(0,0,0,.35);
+    pointer-events: none;
+  }
+  .capture::after {
+    content: '';
+    position: absolute;
+    inset: 16% 16%;
+    border-radius: 50%;
+    border: 3px solid rgba(200, 30, 30, .85);
+    box-shadow: 0 0 10px rgba(200,30,30,.55), inset 0 0 8px rgba(200,30,30,.45);
+  }
+  .selected { outline: 3px solid rgba(255,255,0,.8); outline-offset: -3px; }
+
+  .side {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .panel {
+    background: #0f1216;
+    border: 1px solid #223145;
+    border-radius: 14px;
+    padding: 12px;
+    box-shadow: 0 10px 25px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.03);
+  }
+  .panel h3 { margin: 0 0 10px 0; font-size: 15px; letter-spacing: .4px; color: #bcd2f1; }
+  .log {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 12.5px;
+    line-height: 1.35;
+    max-height: 260px;
+    overflow-y: auto;
+    background: #0c0f14;
+    border: 1px solid #202a38;
+    border-radius: 10px;
+    padding: 10px;
+  }
+  .log .sys { color: #b4f0b4; }
+  .log .plr { color: #d0d6ff; }
+  .log .dobby { color: #78ff7a; }
+  .small { opacity: .7; font-size: 12px; }
+  .footer { opacity: .6; font-size: 12px; text-align: center; grid-column: 1 / -1; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="title">
+    <h1>You vs Dobby <small>— Chess with Sarcasm</small></h1>
+    <div class="controls">
+      <button id="newGame">New Game</button>
+      <button id="flip">Flip Board</button>
+      <button id="hint">Hint</button>
+      <button id="undo">Undo</button>
+    </div>
+  </div>
+
+  <div class="board-stand">
+    <div class="board-frame">
+      <div id="board" class="board">
+        <div id="grid" class="grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="side">
+    <div class="panel">
+      <h3>Game Status</h3>
+      <div id="status">White to move.</div>
+    </div>
+
+    <div class="panel">
+      <h3>Dobby’s Commentary</h3>
+      <div id="dobbyLog" class="log">
+        <div><span class="dobby">Dobby:</span> I'm watching. Try not to embarrass yourself on move one.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Move List</h3>
+      <div id="movelist" class="log"></div>
+    </div>
+  </div>
+
+  <div class="footer">Dobby plays Black. After every move, he speaks his mind. Depth 3 alpha-beta with piece-square tables.</div>
+</div>
+
+<script>
+  /**********************
+   * Fireworks (Dobby)  *
+   **********************/
+  const FIREWORKS_API_KEY = "fw_3ZYt5vRJztdY1fXajRko5YCt";
+  const DOBBY_MODEL = "accounts/sentientfoundation-serverless/models/dobby-mini-unhinged-plus-llama-3-1-8b";
+
+  async function dobbyRoast(aboutWho, moveSAN) {
+    const prompt = `You are Dobby, a sarcastic, foul-mouthed (but not hateful) chess commentator.
+${aboutWho} just played: ${moveSAN}.
+In 1–2 sharp sentences, deliver a witty roast. Avoid slurs or hateful content; light profanity is okay.`;
+
+    try {
+      const res = await fetch("https://api.fireworks.ai/inference/v1/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": "Bearer " + FIREWORKS_API_KEY,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: DOBBY_MODEL,
+          prompt,
+          max_tokens: 60,
+          temperature: 0.95
+        })
+      });
+      const data = await res.json();
+      const text = (data && data.choices && data.choices[0] && data.choices[0].text) ? data.choices[0].text.trim() : "…and somehow, I’m speechless.";
+      logDobby(text);
+    } catch (e) {
+      logDobby("I tried to roast but choked on a network hairball. Fix your setup, human.");
+    }
+  }
+
+  function logDobby(text) {
+    const el = document.getElementById("dobbyLog");
+    const div = document.createElement("div");
+    div.innerHTML = `<span class="dobby">Dobby:</span> ${escapeHTML(text)}`;
+    el.appendChild(div);
+    el.scrollTop = el.scrollHeight;
+  }
+
+  /**********************
+   * Game state & setup *
+   **********************/
+  const game = new Chess();
+
+  const boardEl = document.getElementById('board');
+  const gridEl = document.getElementById('grid');
+  const statusEl = document.getElementById('status');
+  const moveListEl = document.getElementById('movelist');
+
+  let flipped = false;
+  let selected = null;
+  let legalTargets = [];
+  let draggingPiece = null;
+  let startMouse = { x: 0, y: 0 };
+  let startPos = { x: 0, y: 0 };
+
+  const PIECES = {
+    'p': '\u265F', 'n': '\u265E', 'b': '\u265D', 'r': '\u265C', 'q': '\u265B', 'k': '\u265A',
+    'P': '\u2659', 'N': '\u2658', 'B': '\u2657', 'R': '\u2656', 'Q': '\u2655', 'K': '\u2654',
+  };
+
+  function buildGrid() {
+    gridEl.innerHTML = '';
+    for (let r = 8; r >= 1; r--) {
+      for (let f = 1; f <= 8; f++) {
+        const fileChar = 'abcdefgh'[f - 1];
+        const rankNum = r;
+        const id = fileChar + rankNum;
+
+        const sq = document.createElement('div');
+        sq.className = 'sq ' + ((r + f) % 2 === 0 ? 'dark' : 'light');
+        sq.dataset.square = id;
+
+        if (f === 1) {
+          const rank = document.createElement('div');
+          rank.className = 'rank-label';
+          rank.textContent = rankNum;
+          sq.appendChild(rank);
+        }
+        if (r === 1) {
+          const file = document.createElement('div');
+          file.className = 'file-label';
+          file.textContent = fileChar;
+          sq.appendChild(file);
+        }
+
+        sq.addEventListener('click', onSquareClick);
+        gridEl.appendChild(sq);
+      }
+    }
+  }
+
+  function sqToIdx(sq) {
+    const file = sq.charCodeAt(0) - 97;
+    const rank = parseInt(sq[1], 10) - 1;
+    return { file, rank };
+  }
+
+  function idxToSq(file, rank) {
+    return 'abcdefgh'[file] + (rank + 1);
+  }
+
+  function squareToXY(sq) {
+    const { file, rank } = sqToIdx(sq);
+    const f = flipped ? 7 - file : file;
+    const r = flipped ? rank : 7 - rank;
+    const size = boardEl.getBoundingClientRect().width || 640; // Fallback size
+    const cell = size / 8;
+    return { x: f * cell, y: r * cell, cell };
+  }
+
+  function clearHints() {
+    document.querySelectorAll('.hint').forEach(h => h.remove());
+    document.querySelectorAll('.sq').forEach(sq => sq.classList.remove('selected', 'capture'));
+  }
+
+  function showHints(from) {
+    clearHints();
+    const moves = game.moves({ square: from, verbose: true });
+    legalTargets = moves.map(m => m.to);
+
+    const fromSq = document.querySelector(`.sq[data-square="${from}"]`);
+    if (fromSq) fromSq.classList.add('selected');
+
+    moves.forEach(m => {
+      const el = document.querySelector(`.sq[data-square="${m.to}"]`);
+      if (!el) return;
+      const hint = document.createElement('div');
+      hint.className = 'hint';
+      el.appendChild(hint);
+      if (m.flags.includes('c')) el.classList.add('capture');
+    });
+  }
+
+  function renderPieces() {
+    document.querySelectorAll('.piece').forEach(p => p.remove());
+
+    const board = game.board();
+    for (let r = 8; r >= 1; r--) {
+      for (let f = 1; f <= 8; f++) {
+        const sq = 'abcdefgh'[f - 1] + r;
+        const piece = game.get(sq);
+        if (!piece) continue;
+
+        const el = document.createElement('div');
+        el.className = 'piece ' + (piece.color === 'w' ? 'white' : 'black');
+        el.textContent = PIECES[(piece.color === 'w' ? piece.type.toUpperCase() : piece.type)];
+        const { x, y, cell } = squareToXY(sq);
+        el.style.transform = `translate(${x}px, ${y}px)`;
+        el.style.width = `${cell}px`;
+        el.style.height = `${cell}px`;
+        el.dataset.square = sq;
+
+        el.addEventListener('mousedown', startDrag);
+
+        boardEl.appendChild(el);
+      }
+    }
+  }
+
+  function renderAll() {
+    buildGrid();
+    renderPieces();
+    updateStatus();
+    refreshMoveList();
+  }
+
+  function onSquareClick(e) {
+    const sq = e.currentTarget.dataset.square;
+    const piece = game.get(sq);
+
+    if (selected === null) {
+      if (!piece) return;
+      const side = game.turn();
+      if (piece.color !== side) return;
+      selected = sq;
+      showHints(sq);
+      return;
+    }
+
+    if (piece && piece.color === game.turn()) {
+      selected = sq;
+      showHints(sq);
+      return;
+    }
+
+    const move = game.move({ from: selected, to: sq, promotion: 'q' });
+    if (move) {
+      selected = null;
+      clearHints();
+      renderAll();
+      appendMoveToList(move);
+      dobbyRoast("The human", move.san);
+      if (!game.game_over()) {
+        setTimeout(systemMove, 120);
+      }
+    }
+  }
+
+  function startDrag(e) {
+    const sq = e.currentTarget.dataset.square;
+    const piece = game.get(sq);
+    if (!piece || piece.color !== game.turn()) return;
+    selected = sq;
+    showHints(sq);
+
+    draggingPiece = e.currentTarget;
+    const rect = draggingPiece.getBoundingClientRect();
+    startMouse = { x: e.clientX, y: e.clientY };
+    startPos = { x: rect.left, y: rect.top };
+
+    draggingPiece.style.transition = 'none';
+    draggingPiece.style.zIndex = 99;
+
+    document.addEventListener('mousemove', onDrag);
+    document.addEventListener('mouseup', endDrag);
+  }
+
+  function onDrag(e) {
+    if (!draggingPiece) return;
+    const dx = e.clientX - startMouse.x;
+    const dy = e.clientY - startMouse.y;
+    draggingPiece.style.transform = `translate(${startPos.x + dx - boardEl.getBoundingClientRect().left}px, ${startPos.y + dy - boardEl.getBoundingClientRect().top}px)`;
+  }
+
+  function endDrag(e) {
+    if (!draggingPiece) return;
+    const drop = clientToSquare(e.clientX, e.clientY);
+    const from = selected;
+    draggingPiece.style.transition = '';
+    draggingPiece.style.zIndex = '';
+
+    document.removeEventListener('mousemove', onDrag);
+    document.removeEventListener('mouseup', endDrag);
+
+    draggingPiece = null;
+    clearHints();
+
+    if (!drop) { renderPieces(); selected = null; return; }
+
+    const move = game.move({ from, to: drop, promotion: 'q' });
+    selected = null;
+
+    if (move) {
+      renderAll();
+      appendMoveToList(move);
+      dobbyRoast("The human", move.san);
+      if (!game.game_over()) setTimeout(systemMove, 120);
+    } else {
+      renderPieces();
+    }
+  }
+
+  function clientToSquare(clientX, clientY) {
+    const rect = boardEl.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    const cell = rect.width / 8;
+
+    let f = Math.floor(x / cell);
+    let r = Math.floor(y / cell);
+
+    if (flipped) { f = 7 - f; }
+    if (!flipped) { r = 7 - r; }
+
+    if (f < 0 || f > 7 || r < 0 || r > 7) return null;
+    return 'abcdefgh'[f] + (r + 1);
+  }
+
+  function updateStatus() {
+    if (game.in_checkmate()) {
+      statusEl.textContent = (game.turn() === 'w' ? 'Black' : 'White') + ' wins by checkmate.';
+      return;
+    }
+    if (game.in_draw()) {
+      statusEl.textContent = 'Draw: ' + (game.in_stalemate() ? 'stalemate' : game.in_threefold_repetition() ? 'threefold repetition' : '50-move rule');
+      return;
+    }
+    statusEl.textContent = (game.turn() === 'w' ? 'White' : 'Black') + ' to move' + (game.in_check() ? ' — check!' : '');
+  }
+
+  function refreshMoveList() {
+    const history = game.history({ verbose: true });
+    moveListEl.innerHTML = '';
+    let line = [];
+    for (let i = 0; i < history.length; i++) {
+      const ply = history[i];
+      if (i % 2 === 0) {
+        line = [];
+        line.push(`<span class="sys">${(i / 2) + 1}.</span>`);
+        line.push(`<span class="plr">${ply.san}</span>`);
+        if (i === history.length - 1) moveListEl.innerHTML += `<div>${line.join(' ')}</div>`;
+      } else {
+        line.push(`<span class="sys">${ply.san}</span>`);
+        moveListEl.innerHTML += `<div>${line.join(' ')}</div>`;
+      }
+    }
+    if (history.length === 0) moveListEl.innerHTML = '<div class="small">No moves yet.</div>';
+    moveListEl.scrollTop = moveListEl.scrollHeight;
+  }
+
+  function appendMoveToList(move) {
+    refreshMoveList();
+    updateStatus();
+  }
+
+  const pieceValues = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 20000 };
+  const pst_w = {
+    p: [[0,0,0,0,0,0,0,0], [50,50,50,50,50,50,50,50], [10,10,20,30,30,20,10,10], [5,5,10,25,25,10,5,5], [0,0,0,20,20,0,0,0], [5,-5,-10,0,0,-10,-5,5], [5,10,10,-20,-20,10,10,5], [0,0,0,0,0,0,0,0]],
+    n: [[-50,-40,-30,-30,-30,-30,-40,-50], [-40,-20,0,0,0,0,-20,-40], [-30,0,10,15,15,10,0,-30], [-30,5,15,20,20,15,5,-30], [-30,0,15,20,20,15,0,-30], [-30,5,10,15,15,10,5,-30], [-40,-20,0,5,5,0,-20,-40], [-50,-40,-30,-30,-30,-30,-40,-50]],
+    b: [[-20,-10,-10,-10,-10,-10,-10,-20], [-10,0,0,0,0,0,0,-10], [-10,0,5,10,10,5,0,-10], [-10,5,5,10,10,5,5,-10], [-10,0,10,10,10,10,0,-10], [-10,10,10,10,10,10,10,-10], [-10,5,0,0,0,0,5,-10], [-20,-10,-10,-10,-10,-10,-10,-20]],
+    r: [[0,0,0,0,0,0,0,0], [5,10,10,10,10,10,10,5], [-5,0,0,0,0,0,0,-5], [-5,0,0,0,0,0,0,-5], [-5,0,0,0,0,0,0,-5], [-5,0,0,0,0,0,0,-5], [5,10,10,10,10,10,10,5], [0,0,0,0,0,0,0,0]],
+    q: [[-20,-10,-10,-5,-5,-10,-10,-20], [-10,0,0,0,0,0,0,-10], [-10,0,5,5,5,5,0,-10], [-5,0,5,5,5,5,0,-5], [0,0,5,5,5,5,0,-5], [-10,5,5,5,5,5,0,-10], [-10,0,5,0,0,0,0,-10], [-20,-10,-10,-5,-5,-10,-10,-20]],
+    k: [[-30,-40,-40,-50,-50,-40,-40,-30], [-30,-40,-40,-50,-50,-40,-40,-30], [-30,-40,-40,-50,-50,-40,-40,-30], [-30,-40,-40,-50,-50,-40,-40,-30], [-20,-30,-30,-40,-40,-30,-30,-20], [-10,-20,-20,-20,-20,-20,-20,-10], [20,20,0,0,0,0,20,20], [20,30,10,0,0,10,30,20]]
+  };
+  const pst_b = {};
+  for (const k in pst_w) { pst_b[k] = pst_w[k].slice().reverse(); }
+
+  function evaluateBoard(g) {
+    let total = 0;
+    const board = g.board();
+    for (let r = 0; r < 8; r++) {
+      for (let f = 0; f < 8; f++) {
+        const piece = board[r][f];
+        if (!piece) continue;
+        const isWhite = (piece.color === 'w');
+        const base = pieceValues[piece.type];
+        const pst = (piece.color === 'w' ? pst_w : pst_b)[piece.type][r][f];
+        total += (isWhite ? 1 : -1) * (base + pst);
+      }
+    }
+    return total + (Math.random() - 0.5) * 0.5;
+  }
+
+  function minimaxRoot(depth, g, isMaximizing) {
+    const moves = g.moves({ verbose: true });
+    if (moves.length === 0) return null;
+    let bestMove = null;
+    let bestScore = isMaximizing ? -Infinity : Infinity;
+
+    moves.sort((a, b) => (b.flags.includes('c') ? 1 : 0) - (a.flags.includes('c') ? 1 : 0));
+
+    for (const m of moves) {
+      g.move(m);
+      const score = minimax(depth - 1, g, -Infinity, Infinity, !isMaximizing);
+      g.undo();
+      if (isMaximizing && score > bestScore) { bestScore = score; bestMove = m; }
+      if (!isMaximizing && score < bestScore) { bestScore = score; bestMove = m; }
+    }
+    return bestMove;
+  }
+
+  function minimax(depth, g, alpha, beta, isMaximizing) {
+    if (depth === 0 || g.game_over()) {
+      return evaluateBoard(g);
+    }
+    const moves = g.moves({ verbose: true });
+    moves.sort((a, b) => (b.flags.includes('c') ? 1 : 0) - (a.flags.includes('c') ? 1 : 0));
+
+    if (isMaximizing) {
+      let value = -Infinity;
+      for (const m of moves) {
+        g.move(m);
+        value = Math.max(value, minimax(depth - 1, g, alpha, beta, false));
+        g.undo();
+        alpha = Math.max(alpha, value);
+        if (alpha >= beta) break;
+      }
+      return value;
+    } else {
+      let value = Infinity;
+      for (const m of moves) {
+        g.move(m);
+        value = Math.min(value, minimax(depth - 1, g, alpha, beta, true));
+        g.undo();
+        beta = Math.min(beta, value);
+        if (alpha >= beta) break;
+      }
+      return value;
+    }
+  }
+
+  function systemMove() {
+    if (game.game_over()) return;
+    const depth = 3;
+    const isMaximizing = (game.turn() === 'b');
+    const move = minimaxRoot(depth, game, isMaximizing) || game.moves({ verbose: true })[0];
+    game.move(move);
+    renderAll();
+    appendMoveToList(move);
+    dobbyRoast("Dobby", move.san);
+  }
+
+  function escapeHTML(s) {
+    return s.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+  }
+
+  document.getElementById('newGame').addEventListener('click', () => {
+    game.reset();
+    selected = null;
+    clearHints();
+    renderAll();
+    document.getElementById('dobbyLog').innerHTML =
+      `<div><span class="dobby">Dobby:</span> Fresh start? Adorable. Try not to punt your queen this time.</div>`;
+  });
+
+  document.getElementById('flip').addEventListener('click', () => {
+    flipped = !flipped;
+    renderAll();
+  });
+
+  document.getElementById('hint').addEventListener('click', () => {
+    const move = minimaxRoot(2, game, game.turn() === 'w');
+    if (move) {
+      logDobby(`Hint: I'd consider ${move.san}. (Not that you'll listen.)`);
+    } else {
+      logDobby(`Hint: No legal moves. Maybe resign with style.`);
+    }
+  });
+
+  document.getElementById('undo').addEventListener('click', () => {
+    game.undo();
+    game.undo();
+    selected = null;
+    clearHints();
+    renderAll();
+    logDobby("Undo? Bold. Let's pretend that blunder never happened.");
+  });
+
+  renderAll();
+</script>
+</body>
+</html>
